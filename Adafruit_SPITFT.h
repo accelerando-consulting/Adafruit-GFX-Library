@@ -61,6 +61,9 @@ typedef uint32_t ADAGFX_PORT_t; ///< PORT values are 32-bit
 // but don't worry about it too much...the digitalWrite() implementation
 // on these platforms is reasonably efficient and already RAM-resident,
 // only gotcha then is no parallel connection support for now.
+
+#define USE_HANDSHAKE_CALLBACKS
+
 typedef uint32_t ADAGFX_PORT_t; ///< PORT values are 32-bit
 #endif                                     // end !ARM
 typedef volatile ADAGFX_PORT_t *PORTreg_t; ///< PORT register type
@@ -144,6 +147,10 @@ public:
   // and optional reset pin. cs is required but can be -1 if unused.
   Adafruit_SPITFT(uint16_t w, uint16_t h, SPIClass *spiClass, int8_t cs,
                   int8_t dc, int8_t rst = -1);
+
+  // Hardware SPI constructor as above, but also arbitrary callbacks to do handshake
+  Adafruit_SPITFT(uint16_t w, uint16_t h,
+		  void (*set_dc)(bool), void (*set_cs)(bool)=NULL, void (*set_rst)(bool)=NULL);
 #endif // end !ESP8266
 
   // Parallel constructor: expects width & height (rotation 0), flag
@@ -289,6 +296,7 @@ public:
               connection is parallel.
   */
   void SPI_CS_HIGH(void) {
+  if (_csSetCallback) { _csSetCallback(HIGH); return; }
 #if defined(USE_FAST_PINIO)
 #if defined(HAS_PORT_SET_CLR)
 #if defined(KINETISK)
@@ -311,6 +319,7 @@ public:
               connection is parallel.
   */
   void SPI_CS_LOW(void) {
+  if (_csSetCallback) { _csSetCallback(LOW); return; }
 #if defined(USE_FAST_PINIO)
 #if defined(HAS_PORT_SET_CLR)
 #if defined(KINETISK)
@@ -330,6 +339,7 @@ public:
       @brief  Set the data/command line HIGH (data mode).
   */
   void SPI_DC_HIGH(void) {
+  if (_dcSetCallback) { _dcSetCallback(HIGH); return; }
 #if defined(USE_FAST_PINIO)
 #if defined(HAS_PORT_SET_CLR)
 #if defined(KINETISK)
@@ -349,6 +359,7 @@ public:
       @brief  Set the data/command line LOW (command mode).
   */
   void SPI_DC_LOW(void) {
+  if (_dcSetCallback) { _dcSetCallback(LOW); return; }
 #if defined(USE_FAST_PINIO)
 #if defined(HAS_PORT_SET_CLR)
 #if defined(KINETISK)
@@ -524,6 +535,10 @@ protected:
   uint8_t invertOffCommand = 0; ///< Command to disable invert mode
 
   uint32_t _freq = 0; ///< Dummy var to keep subclasses happy
+public: //NOCOMMIT
+  void (*_csSetCallback)(bool)=NULL;
+  void (*_dcSetCallback)(bool)=NULL;
+  void (*_rstSetCallback)(bool)=NULL;
 };
 
 #endif // end __AVR_ATtiny85__

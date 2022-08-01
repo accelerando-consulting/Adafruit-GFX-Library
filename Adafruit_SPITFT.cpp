@@ -344,6 +344,25 @@ Adafruit_SPITFT::Adafruit_SPITFT(uint16_t w, uint16_t h, SPIClass *spiClass,
 #endif // end !ESP8266
 
 /*!
+    @brief   Adafruit_SPITFT constructor for hardware SPI using a specific
+             SPI peripheral, but with callback functions tos et handshake
+             pins (eg if they are on an io expander chip)
+    @param   w         Display width in pixels at default rotation (0).
+    @param   h         Display height in pixels at default rotation (0).
+    @param   set_cs    Pointer to a function that sets CS
+    @param   set_dc    Pointer to a function that sets DC
+    @param   set_rst   Pointer to a function that sets RST
+*/
+Adafruit_SPITFT::Adafruit_SPITFT(uint16_t w, uint16_t h,
+                                 void (*set_dc)(bool), void (*set_cs)(bool), void (*set_rst)(bool))
+	: 
+	Adafruit_SPITFT(w, h, &SPI, -1, -1, -1) {
+	_dcSetCallback = set_dc;
+	_csSetCallback =set_cs;
+	_rstSetCallback =set_rst;
+}
+
+/*!
     @brief   Adafruit_SPITFT constructor for parallel display connection.
     @param   w         Display width in pixels at default rotation (0).
     @param   h         Display height in pixels at default rotation (0).
@@ -534,9 +553,18 @@ void Adafruit_SPITFT::initSPI(uint32_t freq, uint8_t spiMode) {
     pinMode(_cs, OUTPUT);
     digitalWrite(_cs, HIGH); // Deselect
   }
-  pinMode(_dc, OUTPUT);
-  digitalWrite(_dc, HIGH); // Data mode
-
+  else if (_csSetCallback) {
+    _csSetCallback(HIGH);
+  }
+  
+  if (_dc >= 0) {
+    pinMode(_dc, OUTPUT);
+    digitalWrite(_dc, HIGH); // Data mode
+  }
+  else if (_dcSetCallback) {
+    _dcSetCallback(HIGH);
+  }
+  
   if (connection == TFT_HARD_SPI) {
 
 #if defined(SPI_HAS_TRANSACTION)
@@ -646,6 +674,14 @@ void Adafruit_SPITFT::initSPI(uint32_t freq, uint8_t spiMode) {
     digitalWrite(_rst, LOW);
     delay(100);
     digitalWrite(_rst, HIGH);
+    delay(200);
+  }
+  else if (_rstSetCallback) {
+    _rstSetCallback(HIGH);
+    delay(100);
+    _rstSetCallback(LOW);
+    delay(100);
+    _rstSetCallback(HIGH);
     delay(200);
   }
 
@@ -911,7 +947,7 @@ void Adafruit_SPITFT::setSPISpeed(uint32_t freq) {
 */
 void Adafruit_SPITFT::startWrite(void) {
   SPI_BEGIN_TRANSACTION();
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_LOW();
 }
 
@@ -922,7 +958,7 @@ void Adafruit_SPITFT::startWrite(void) {
             for all display types; not an SPI-specific function.
 */
 void Adafruit_SPITFT::endWrite(void) {
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_HIGH();
   SPI_END_TRANSACTION();
 }
@@ -1901,7 +1937,7 @@ data
 void Adafruit_SPITFT::sendCommand(uint8_t commandByte, uint8_t *dataBytes,
                                   uint8_t numDataBytes) {
   SPI_BEGIN_TRANSACTION();
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_LOW();
 
   SPI_DC_LOW();          // Command mode
@@ -1918,7 +1954,7 @@ void Adafruit_SPITFT::sendCommand(uint8_t commandByte, uint8_t *dataBytes,
     }
   }
 
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_HIGH();
   SPI_END_TRANSACTION();
 }
@@ -1933,7 +1969,7 @@ void Adafruit_SPITFT::sendCommand(uint8_t commandByte, uint8_t *dataBytes,
 void Adafruit_SPITFT::sendCommand(uint8_t commandByte, const uint8_t *dataBytes,
                                   uint8_t numDataBytes) {
   SPI_BEGIN_TRANSACTION();
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_LOW();
 
   SPI_DC_LOW();          // Command mode
@@ -1949,7 +1985,7 @@ void Adafruit_SPITFT::sendCommand(uint8_t commandByte, const uint8_t *dataBytes,
     }
   }
 
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_HIGH();
   SPI_END_TRANSACTION();
 }
@@ -1969,7 +2005,7 @@ void Adafruit_SPITFT::sendCommand16(uint16_t commandWord,
                                     const uint8_t *dataBytes,
                                     uint8_t numDataBytes) {
   SPI_BEGIN_TRANSACTION();
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_LOW();
 
   if (numDataBytes == 0) {
@@ -1985,7 +2021,7 @@ void Adafruit_SPITFT::sendCommand16(uint16_t commandWord,
     SPI_WRITE16((uint16_t)pgm_read_byte(dataBytes++));
   }
 
-  if (_cs >= 0)
+  if ((_cs >= 0) || _csSetCallback)
     SPI_CS_HIGH();
   SPI_END_TRANSACTION();
 }
